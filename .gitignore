@@ -8,6 +8,7 @@ cf
 *.dll
 *.so
 *.dylib
+cf-tool
 
 # Test binary, built with `go test -c`
 *.test
