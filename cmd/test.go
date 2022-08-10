@@ -61,10 +61,9 @@ func plain(raw []byte) string {
 	return b.String()
 }
 
-func judge(sampleID, command string) error {
-	inPath := fmt.Sprintf("in%v.txt", sampleID)
-	ansPath := fmt.Sprintf("ans%v.txt", sampleID)
-	input, err := os.Open(inPath)
+func judge(tpls config.FileTemplates, sampleID, command string) error {
+	tpls = applyReplacement(tpls, "i", sampleID)
+	input, err := os.Open(tpls.Input)
 	if err != nil {
 		return err
 	}
@@ -106,7 +105,7 @@ func judge(sampleID, command string) error {
 		}
 	}
 
-	b, err := ioutil.ReadFile(ansPath)
+	b, err := ioutil.ReadFile(tpls.Answer)
 	if err != nil {
 		b = []byte{}
 	}
@@ -118,7 +117,7 @@ func judge(sampleID, command string) error {
 	if out == ans {
 		state = color.New(color.FgGreen).Sprintf("Passed #%v", sampleID)
 	} else {
-		input, err := ioutil.ReadFile(inPath)
+		input, err := ioutil.ReadFile(tpls.Input)
 		if err != nil {
 			return err
 		}
@@ -151,14 +150,22 @@ func judge(sampleID, command string) error {
 // Test command
 func Test() (err error) {
 	cfg := config.Instance
+	info := Args.Info
+	tpls := applyInfo(cfg.FileTemplates, info)
+
 	if len(cfg.Template) == 0 {
 		return errors.New("You have to add at least one code template by `cf config`")
 	}
-	samples := getSampleID()
+	samples := getSampleID(tpls)
 	if len(samples) == 0 {
 		return errors.New("Cannot find any sample file")
 	}
-	filename, index, err := getOneCode(Args.File, cfg.Template)
+
+	basePath := Args.File
+	if Args.File == "" {
+		basePath = tpls.Code
+	}
+	filename, index, err := getOneCode(basePath, cfg.Template)
 	if err != nil {
 		return
 	}
@@ -169,6 +176,9 @@ func Test() (err error) {
 	rand := util.RandString(8)
 
 	filter := func(cmd string) string {
+		cmd = strings.ReplaceAll(cmd, "$%prob%$", info.ProblemID)
+		cmd = strings.ReplaceAll(cmd, "$%contest%$", info.ContestID)
+
 		cmd = strings.ReplaceAll(cmd, "$%rand%$", rand)
 		cmd = strings.ReplaceAll(cmd, "$%path%$", path)
 		cmd = strings.ReplaceAll(cmd, "$%full%$", full)
@@ -193,7 +203,7 @@ func Test() (err error) {
 	}
 	if s := filter(template.Script); len(s) > 0 {
 		for _, i := range samples {
-			err := judge(i, s)
+			err := judge(tpls, i, s)
 			if err != nil {
 				color.Red(err.Error())
 			}

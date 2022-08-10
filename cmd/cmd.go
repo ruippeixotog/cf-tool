@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/docopt/docopt-go"
 
@@ -55,22 +56,43 @@ func Eval(opts docopt.Opts) error {
 	return nil
 }
 
-func getSampleID() (samples []string) {
-	path, err := os.Getwd()
+func applyInfo(tpls config.FileTemplates, info client.Info) config.FileTemplates {
+	basePath := info.Path()
+
+	apply := func(str string) string {
+		if info.ProblemID != "" {
+			str = strings.ReplaceAll(str, "$%prob%$", info.ProblemID)
+		}
+		return filepath.Join(basePath, str)
+	}
+
+	return config.FileTemplates{
+		Input:  apply(tpls.Input),
+		Answer: apply(tpls.Answer),
+		Code:   apply(tpls.Code),
+	}
+}
+
+func applyReplacement(tpls config.FileTemplates, key, value string) config.FileTemplates {
+	return config.FileTemplates{
+		Input:  strings.ReplaceAll(tpls.Input, "$%"+key+"%$", value),
+		Answer: strings.ReplaceAll(tpls.Answer, "$%"+key+"%$", value),
+		Code:   strings.ReplaceAll(tpls.Code, "$%"+key+"%$", value),
+	}
+}
+
+func getSampleID(tpls config.FileTemplates) (samples []string) {
+	paths, err := ioutil.ReadDir(filepath.Dir(tpls.Input))
 	if err != nil {
 		return
 	}
-	paths, err := ioutil.ReadDir(path)
-	if err != nil {
-		return
-	}
-	reg := regexp.MustCompile(`in(\d+).txt`)
+	reg := regexp.MustCompile(strings.ReplaceAll(filepath.Base(tpls.Input), "$%i%$", `(\d+)`))
 	for _, path := range paths {
 		name := path.Name()
 		tmp := reg.FindSubmatch([]byte(name))
 		if tmp != nil {
 			idx := string(tmp[1])
-			ans := fmt.Sprintf("ans%v.txt", idx)
+			ans := strings.ReplaceAll(tpls.Answer, "$%i%$", fmt.Sprint(idx))
 			if _, err := os.Stat(ans); err == nil {
 				samples = append(samples, idx)
 			}
@@ -98,31 +120,20 @@ func getCode(filename string, templates []config.CodeTemplate) (codes []CodeList
 		}
 	}
 
-	if filename != "" {
+	if info, _ := os.Stat(filename); info != nil && !info.IsDir() {
 		ext := filepath.Ext(filename)
 		if idx, ok := mp[ext]; ok {
-			return []CodeList{CodeList{filename, idx}}, nil
+			return []CodeList{{filename, idx}}, nil
 		}
 		return nil, fmt.Errorf("%v can not match any template. You could add a new template by `cf config`", filename)
-	}
-
-	path, err := os.Getwd()
-	if err != nil {
-		return
-	}
-	paths, err := ioutil.ReadDir(path)
-	if err != nil {
-		return
-	}
-
-	for _, path := range paths {
-		name := path.Name()
-		ext := filepath.Ext(name)
-		if idx, ok := mp[ext]; ok {
-			codes = append(codes, CodeList{name, idx})
+	} else {
+		for ext, idx := range mp {
+			fullPath := filename + ext
+			if info, _ := os.Stat(fullPath); info != nil && !info.IsDir() {
+				codes = append(codes, CodeList{fullPath, idx})
+			}
 		}
 	}
-
 	return codes, nil
 }
 

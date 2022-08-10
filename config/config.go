@@ -22,6 +22,12 @@ type CodeTemplate struct {
 	AfterScript  string   `json:"after_script"`
 }
 
+type FileTemplates struct {
+	Input  string `json:"input"`
+	Answer string `json:"answer"`
+	Code   string `json:"code"`
+}
+
 // Config load and save configuration
 type Config struct {
 	Template      []CodeTemplate    `json:"template"`
@@ -30,6 +36,7 @@ type Config struct {
 	Host          string            `json:"host"`
 	Proxy         string            `json:"proxy"`
 	FolderName    map[string]string `json:"folder_name"`
+	FileTemplates FileTemplates     `json:"file_templates"`
 	path          string
 }
 

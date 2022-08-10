@@ -33,7 +33,7 @@ Usage:
   cf list [<specifier>...]
   cf parse [<specifier>...]
   cf gen [<alias>]
-  cf test [<file>]
+  cf test [<specifier>...]
   cf watch [all] [<specifier>...]
   cf open [<specifier>...]
   cf stand [<specifier>...]

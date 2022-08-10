@@ -12,7 +12,13 @@ func Submit() (err error) {
 	cln := client.Instance
 	cfg := config.Instance
 	info := Args.Info
-	filename, index, err := getOneCode(Args.File, cfg.Template)
+	tpls := applyInfo(cfg.FileTemplates, info)
+
+	basePath := Args.File
+	if Args.File == "" {
+		basePath = tpls.Code
+	}
+	filename, index, err := getOneCode(basePath, cfg.Template)
 	if err != nil {
 		return
 	}

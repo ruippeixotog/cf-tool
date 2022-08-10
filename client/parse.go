@@ -40,7 +40,7 @@ func findSample(body []byte) (input [][]byte, output [][]byte, err error) {
 }
 
 // ParseProblem parse problem to path. mu can be nil
-func (c *Client) ParseProblem(URL, path string, mu *sync.Mutex) (samples int, standardIO bool, err error) {
+func (c *Client) ParseProblem(URL, inTpl, ansTpl string, mu *sync.Mutex) (samples int, standardIO bool, err error) {
 	body, err := util.GetBody(c.client, URL)
 	if err != nil {
 		return
@@ -62,8 +62,17 @@ func (c *Client) ParseProblem(URL, path string, mu *sync.Mutex) (samples int, st
 	}
 
 	for i := 0; i < len(input); i++ {
-		fileIn := filepath.Join(path, fmt.Sprintf("in%v.txt", i+1))
-		fileOut := filepath.Join(path, fmt.Sprintf("ans%v.txt", i+1))
+		fileIn := strings.ReplaceAll(inTpl, "$%i%$", fmt.Sprint(i+1))
+		fileOut := strings.ReplaceAll(ansTpl, "$%i%$", fmt.Sprint(i+1))
+
+		err = os.MkdirAll(filepath.Dir(fileIn), os.ModePerm)
+		if err != nil {
+			return
+		}
+		err = os.MkdirAll(filepath.Dir(fileOut), os.ModePerm)
+		if err != nil {
+			return
+		}
 		e := ioutil.WriteFile(fileIn, input[i], 0644)
 		if e != nil {
 			if mu != nil {
@@ -89,7 +98,7 @@ func (c *Client) ParseProblem(URL, path string, mu *sync.Mutex) (samples int, st
 }
 
 // Parse parse
-func (c *Client) Parse(info Info) (problems []string, paths []string, err error) {
+func (c *Client) Parse(info Info, inTpl, ansTpl string) (problems []string, err error) {
 	color.Cyan("Parse " + info.Hint())
 
 	problemID := info.ProblemID
@@ -102,7 +111,7 @@ func (c *Client) Parse(info Info) (problems []string, paths []string, err error)
 	if problemID == "" {
 		statics, err := c.Statis(info)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		problems = make([]string, len(statics))
 		for i, problem := range statics {
@@ -117,22 +126,18 @@ func (c *Client) Parse(info Info) (problems []string, paths []string, err error)
 	wg := sync.WaitGroup{}
 	wg.Add(len(problems))
 	mu := sync.Mutex{}
-	paths = make([]string, len(problems))
-	for i, problemID := range problems {
-		paths[i] = filepath.Join(contestPath, strings.ToLower(problemID))
-		go func(problemID, path string) {
+	for _, problemID := range problems {
+		go func(problemID string) {
 			defer wg.Done()
 			mu.Lock()
 			fmt.Printf("Parsing %v\n", problemID)
 			mu.Unlock()
 
-			err = os.MkdirAll(path, os.ModePerm)
-			if err != nil {
-				return
-			}
 			URL := fmt.Sprintf(urlFormatter, problemID)
+			inPath := strings.ReplaceAll(inTpl, "$%prob%$", problemID)
+			ansPath := strings.ReplaceAll(ansTpl, "$%prob%$", problemID)
 
-			samples, standardIO, err := c.ParseProblem(URL, path, &mu)
+			samples, standardIO, err := c.ParseProblem(URL, inPath, ansPath, &mu)
 			if err != nil {
 				return
 			}
@@ -148,7 +153,7 @@ func (c *Client) Parse(info Info) (problems []string, paths []string, err error)
 				ansi.Printf("%v %v\n", color.GreenString("Parsed %v with %v samples.", problemID, samples), warns)
 			}
 			mu.Unlock()
-		}(problemID, paths[i])
+		}(problemID)
 	}
 	wg.Wait()
 	return

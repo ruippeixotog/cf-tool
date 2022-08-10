@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 
 	"github.com/ruippeixotog/cf-tool/client"
 	"github.com/ruippeixotog/cf-tool/config"
@@ -13,6 +14,8 @@ func Parse() (err error) {
 	cfg := config.Instance
 	cln := client.Instance
 	info := Args.Info
+	tpls := applyInfo(cfg.FileTemplates, info)
+
 	source := ""
 	ext := ""
 	if cfg.GenAfterParse {
@@ -26,12 +29,13 @@ func Parse() (err error) {
 		}
 	}
 	work := func() error {
-		_, paths, err := cln.Parse(info)
+		problems, err := cln.Parse(info, tpls.Input, tpls.Answer)
 		if err != nil {
 			return err
 		}
 		if cfg.GenAfterParse {
-			for _, path := range paths {
+			for _, prob := range problems {
+				path := strings.ReplaceAll(tpls.Code, "$%prob%$", prob)
 				gen(source, path, ext)
 			}
 		}

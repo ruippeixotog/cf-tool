@@ -36,10 +36,12 @@ func readTemplateSource(path string, cln *client.Client) (source string, err err
 	return
 }
 
-func gen(source, currentPath, ext string) error {
-	path := filepath.Join(currentPath, filepath.Base(currentPath))
-
+func gen(source, path, ext string) error {
 	savePath := path + ext
+	err := os.MkdirAll(filepath.Dir(savePath), os.ModePerm)
+	if err != nil {
+		return err
+	}
 	i := 1
 	for _, err := os.Stat(savePath); err == nil; _, err = os.Stat(savePath) {
 		tmpPath := fmt.Sprintf("%v%v%v", path, i, ext)
@@ -48,7 +50,7 @@ func gen(source, currentPath, ext string) error {
 		i++
 	}
 
-	err := ioutil.WriteFile(savePath, []byte(source), 0644)
+	err = ioutil.WriteFile(savePath, []byte(source), 0644)
 	if err == nil {
 		color.Green("Generated! See %v", filepath.Base(savePath))
 	}
